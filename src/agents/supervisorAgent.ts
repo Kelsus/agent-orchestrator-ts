@@ -216,9 +216,11 @@ ${this.leadAgentGuidelines}
   }
 
   private async sendMessages(messages: Array<{ recipient: string; content: string }>): Promise<string> {
-    try {      
+    try {
       Logger.logger.info(`\n> Lead Agent Messages: ${messages}`);
-      const tasks = messages
+      Logger.logger.info(`\n> Lead Agent Messages is an Array: ${Array.isArray(messages)}`);
+      const messagesA = Array.isArray(messages) ? messages : JSON.parse(messages);
+      const tasks = messagesA
         .map((message) => {
           const agent = this.team.find((a) => a.name === message.recipient);
           return agent ? this.sendMessage(agent, message.content, this.userId, this.sessionId, {}) : null;
