@@ -55,7 +55,7 @@ export class OpenAIAgent extends Agent {
   private customVariables: TemplateVariables;
   protected retriever?: Retriever;
   private formatResponseAsJson?: boolean;
-  private toolConfig?: {
+  public toolConfig?: {
     tool: OpenAI.ChatCompletionTool[];
     useToolHandler: (response: any, conversation: any[]) => any;
     toolMaxRecursions?: number;
