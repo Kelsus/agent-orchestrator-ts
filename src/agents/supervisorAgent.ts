@@ -167,8 +167,6 @@ export class SupervisorAgent extends Agent {
 
     this.supervisorTools = sendMessagesTool;
 
-    console.log();
-
     this.leadAgent.toolConfig = {
       tool: this.supervisorTools,
       useToolHandler: (response: any, conversation: any[]) => {},
@@ -177,8 +175,12 @@ export class SupervisorAgent extends Agent {
   }
 
   private configurePrompt(): void {
-    const toolsStr = (this.supervisorTools instanceof AgentTools ? this.supervisorTools.tools : this.supervisorTools)
-      .map((tool) => `${tool.name}:${tool.description}`).join("\n");
+    let toolsStr;
+    if (this.supervisorTools instanceof AgentTools) {
+      toolsStr = this.supervisorTools.tools.map((tool) => `${tool.name}:${tool.description}`).join("\n");
+    } else {
+      toolsStr = `${this.supervisorTools[0].function.name}:${this.supervisorTools[0].function.description}`).join("\n");
+    }
 
     const agentListStr = this.team.map((agent) => `${agent.name}: ${agent.description}`).join("\n");
 
