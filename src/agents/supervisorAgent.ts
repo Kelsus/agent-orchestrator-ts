@@ -136,30 +136,32 @@ export class SupervisorAgent extends Agent {
       {
         type: "function",
         function: {
-          name: 'send_messages',
+          name: "send_messages",
           description: "Send messages to multiple agents in parallel.",
           parameters: {
-            messages: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  recipient: {
-                    type: "string",
-                    description: "Agent name to send message to.",
+            type: "object",
+            properties: {
+              messages: {
+                type: "array",
+                description: "Array of messages for different agents.",
+                minItems: 1,
+                items: {
+                  type: "object",
+                  properties: {
+                    recipient: {
+                      type: "string",
+                      description: "Agent name to send message to.",
+                    },
+                    content: {
+                      type: "string",
+                      description: "Message content.",
+                    },
                   },
-                  content: {
-                    type: "string",
-                    description: "Message content.",
-                  },
+                  required: ["recipient", "content"],
                 },
-                required: ["recipient", "content"],
               },
-              description: "Array of messages for different agents.",
-              minItems: 1,
             },
             required: ["messages"],
-            func: this.sendMessages.bind(this)
           },
         },
       },
