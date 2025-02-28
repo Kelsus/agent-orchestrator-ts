@@ -7,7 +7,7 @@ import { AgentTool, AgentTools } from "../utils/tool";
 import { InMemoryChatStorage } from "../storage/memoryChatStorage";
 import { ChatStorage } from "../storage/chatStorage";
 import { OpenAIAgent } from "./openAIAgent";
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
 export interface SupervisorAgentOptions extends AgentOptions {
   leadAgent: BedrockLLMAgent | AnthropicAgent | OpenAIAgent;
@@ -157,12 +157,14 @@ export class SupervisorAgent extends Agent {
                     },
                   },
                   required: ["recipient", "content"],
+                  additionalProperties: false,
                 },
               },
             },
             required: ["messages"],
+            additionalProperties: false,
           },
-          strict: true
+          strict: true,
         },
       },
     ];
@@ -339,8 +341,6 @@ ${this.leadAgentGuidelines}
   }
 
   getChilds(): { [key: string]: AgentDescription } {
-    return Object.fromEntries(
-      this.team.map((agent) => [agent.id, { name: agent.name, description: agent.description, model: agent.getModel(), childs: agent.getChilds() }])
-    );
+    return Object.fromEntries(this.team.map((agent) => [agent.id, { name: agent.name, description: agent.description, model: agent.getModel(), childs: agent.getChilds() }]));
   }
 }
