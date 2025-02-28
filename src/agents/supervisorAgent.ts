@@ -7,6 +7,7 @@ import { AgentTool, AgentTools } from "../utils/tool";
 import { InMemoryChatStorage } from "../storage/memoryChatStorage";
 import { ChatStorage } from "../storage/chatStorage";
 import { OpenAIAgent } from "./openAIAgent";
+import OpenAI from 'openai';
 
 export interface SupervisorAgentOptions extends AgentOptions {
   leadAgent: BedrockLLMAgent | AnthropicAgent | OpenAIAgent;
@@ -47,7 +48,7 @@ export class SupervisorAgent extends Agent {
   private trace: boolean;
   private userId: string = "";
   private sessionId: string = "";
-  private supervisorTools: AgentTools;
+  private supervisorTools: AgentTools | OpenAI.ChatCompletionTool[];
   private promptTemplate: string;
 
   constructor(options: SupervisorAgentOptions) {
@@ -77,7 +78,12 @@ export class SupervisorAgent extends Agent {
 
     this.leadAgentGuidelines = options.leadAgentGuidelines || SupervisorAgent.DEFAULT_LEAD_AGENT_GUIDELINES;
 
-    this.configureSupervisorTools(options.extraTools);
+    if (options.leadAgent instanceof OpenAIAgent) {
+      // TODO: Add support for extra tools
+      this.configureSupervisorToolsForOpenAI();
+    } else {
+      this.configureSupervisorTools(options.extraTools);
+    }
     this.configurePrompt();
   }
 
@@ -121,6 +127,51 @@ export class SupervisorAgent extends Agent {
 
     this.leadAgent.toolConfig = {
       tool: this.supervisorTools,
+      toolMaxRecursions: SupervisorAgent.DEFAULT_TOOL_MAX_RECURSIONS,
+    };
+  }
+
+  private configureSupervisorToolsForOpenAI(): void {
+    const sendMessagesTool: OpenAI.ChatCompletionTool[] = [
+      {
+        type: "function",
+        function: {
+          name: 'send_messages',
+          description: "Send messages to multiple agents in parallel.",
+          parameters: {
+            messages: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  recipient: {
+                    type: "string",
+                    description: "Agent name to send message to.",
+                  },
+                  content: {
+                    type: "string",
+                    description: "Message content.",
+                  },
+                },
+                required: ["recipient", "content"],
+              },
+              description: "Array of messages for different agents.",
+              minItems: 1,
+            },
+            required: ["messages"],
+            func: this.sendMessages.bind(this)
+          },
+        },
+      },
+    ];
+
+    this.supervisorTools = sendMessagesTool;
+
+    console.log();
+
+    this.leadAgent.toolConfig = {
+      tool: this.supervisorTools,
+      useToolHandler: (response: any, conversation: any[]) => any,
       toolMaxRecursions: SupervisorAgent.DEFAULT_TOOL_MAX_RECURSIONS,
     };
   }
