@@ -217,7 +217,7 @@ ${this.leadAgentGuidelines}
 
   private async sendMessages(messages: Array<{ recipient: string; content: string }>): Promise<string> {
     try {
-      Logger.logger.info(`\n> Lead Agent Messages: ${messages}`);
+      Logger.logger.info(`\n> Lead Agent Messages Type: ${typeof messages}`);
       Logger.logger.info(`\n> Lead Agent Messages is an Array: ${Array.isArray(messages)}`);
       const messagesA = Array.isArray(messages) ? messages : JSON.parse(messages);
       const tasks = messagesA
