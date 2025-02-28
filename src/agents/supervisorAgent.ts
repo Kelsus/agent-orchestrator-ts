@@ -6,9 +6,10 @@ import { Logger } from "../utils/logger";
 import { AgentTool, AgentTools } from "../utils/tool";
 import { InMemoryChatStorage } from "../storage/memoryChatStorage";
 import { ChatStorage } from "../storage/chatStorage";
+import { OpenAIAgent } from "./openAIAgent";
 
 export interface SupervisorAgentOptions extends AgentOptions {
-  leadAgent: BedrockLLMAgent | AnthropicAgent;
+  leadAgent: BedrockLLMAgent | AnthropicAgent | OpenAIAgent;
   leadAgentGuidelines?: string;
   team: Agent[];
   storage?: ChatStorage;
@@ -39,7 +40,7 @@ export class SupervisorAgent extends Agent {
 - NEVER output your thoughts before and after you invoke a tool or before you respond to the User.
   `;
 
-  private leadAgent: BedrockLLMAgent | AnthropicAgent;
+  private leadAgent: BedrockLLMAgent | AnthropicAgent | OpenAIAgent;
   private leadAgentGuidelines: string;
   private team: Agent[];
   private storage: ChatStorage;
@@ -50,8 +51,8 @@ export class SupervisorAgent extends Agent {
   private promptTemplate: string;
 
   constructor(options: SupervisorAgentOptions) {
-    if (!(options.leadAgent instanceof BedrockLLMAgent || options.leadAgent instanceof AnthropicAgent)) {
-      throw new Error("Supervisor must be BedrockLLMAgent or AnthropicAgent");
+    if (!(options.leadAgent instanceof BedrockLLMAgent || options.leadAgent instanceof AnthropicAgent || options.leadAgent instanceof OpenAIAgent)) {
+      throw new Error("Supervisor must be either BedrockLLMAgent, AnthropicAgent or OpenAIAgent");
     }
 
     if (options.extraTools && !(options.extraTools instanceof AgentTools || Array.isArray(options.extraTools))) {

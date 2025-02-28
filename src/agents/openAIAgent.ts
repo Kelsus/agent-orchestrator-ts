@@ -29,6 +29,11 @@ export interface OpenAIAgentOptions extends AgentOptions {
   };
   retriever?: Retriever;
   formatResponseAsJson?: boolean;
+  toolConfig?: {
+    tool: OpenAI.ChatCompletionTool[];
+    useToolHandler: (response: any, conversation: any[]) => any;
+    toolMaxRecursions?: number;
+  };
 }
 
 export type OpenAIAgentOptionsWithAuth = OpenAIAgentOptions & (WithApiKey | WithClient);
@@ -50,7 +55,11 @@ export class OpenAIAgent extends Agent {
   private customVariables: TemplateVariables;
   protected retriever?: Retriever;
   private formatResponseAsJson?: boolean;
-
+  private toolConfig?: {
+    tool: OpenAI.ChatCompletionTool[];
+    useToolHandler: (response: any, conversation: any[]) => any;
+    toolMaxRecursions?: number;
+  };
 
   constructor(options: OpenAIAgentOptionsWithAuth) {
 
@@ -80,7 +89,7 @@ export class OpenAIAgent extends Agent {
     };
 
     this.retriever = options.retriever ?? null;
-
+    this.toolConfig = options.toolConfig ?? null;
 
     this.promptTemplate = `You are a ${this.name}. ${this.description} Provide helpful and accurate information based on your expertise.
     You will engage in an open-ended conversation, providing helpful and accurate information based on your expertise.
@@ -153,14 +162,43 @@ export class OpenAIAgent extends Agent {
       temperature,
       top_p: topP,
       stop: stopSequences,
-      response_format: {type: this.formatResponseAsJson ? 'json_object' : 'text'}
+      response_format: {type: this.formatResponseAsJson ? 'json_object' : 'text'},
+      tools: this.toolConfig?.tool || undefined
     };
 
 
     if (this.streaming) {
       return this.handleStreamingResponse(requestOptions);
     } else {
-      return this.handleSingleResponse(requestOptions);
+      let finalMessage: string = '';
+      let toolUse = false;
+      let recursions = this.toolConfig?.toolMaxRecursions || 5;
+
+      do {
+        const response = await this.handleSingleResponse(requestOptions);
+
+        if (response.tool_calls) {
+          messages.push(response);
+
+          if (!this.toolConfig) {
+            throw new Error('No tools available for tool use');
+          }
+
+          const toolResponse = await this.toolConfig.useToolHandler(response, messages);
+          messages.push(toolResponse);
+          toolUse = true;
+        } else {
+          finalMessage = response.content;
+          toolUse = false;
+        }
+
+        recursions--;
+      } while (toolUse && recursions > 0);
+
+      return {
+        role: ParticipantRole.ASSISTANT,
+        content: [{ text: finalMessage }],
+      };
     }
   }
 
@@ -191,7 +229,7 @@ export class OpenAIAgent extends Agent {
     });
   }
 
-  private async handleSingleResponse(input: any): Promise<ConversationMessage> {
+  private async handleSingleResponse(input: any): Promise<OpenAI.Chat.ChatCompletionMessage> {
     try {
       const nonStreamingOptions = { ...input, stream: false };
       const chatCompletion = await this.client.chat.completions.create(nonStreamingOptions);
@@ -205,23 +243,99 @@ export class OpenAIAgent extends Agent {
         throw new Error('Unexpected response format from OpenAI API');
       }
 
-      return {
-        role: ParticipantRole.ASSISTANT,
-        content: [{ text: assistantMessage }],
-      };
+      const message = chatCompletion.choices[0].message;
+      return message as OpenAI.Chat.ChatCompletionMessage;
     } catch (error) {
       Logger.logger.error('Error in OpenAI API call:', error);
       throw error;
     }
   }
 
-  private async *handleStreamingResponse(options: OpenAI.Chat.ChatCompletionCreateParams): AsyncIterable<string> {
-    const stream = await this.client.chat.completions.create({ ...options, stream: true });
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        yield content;
+  private async * handleStreamingResponse(options: OpenAI.Chat.ChatCompletionCreateParams): AsyncIterable<string> {
+    let recursions = this.toolConfig?.toolMaxRecursions || 5;
+
+    while (recursions > 0) {
+      // Add tool calls to messages before creating stream
+      const messagesWithToolCalls = [...options.messages];
+
+      const stream = await this.client.chat.completions.create({
+        ...options,
+        messages: messagesWithToolCalls,
+        stream: true
+      });
+
+      let currentToolCalls: any[] = [];
+      let hasToolCalls = false;
+
+      for await (const chunk of stream) {
+        const toolCalls = chunk.choices[0]?.delta?.tool_calls;
+
+        if (toolCalls) {
+          for (const toolCall of toolCalls) {
+            if (toolCall.id) {
+              currentToolCalls.push({
+                id: toolCall.id,
+                function: toolCall.function,
+              });
+            }
+
+            if (toolCall.function?.arguments) {
+              const lastToolCall = currentToolCalls[currentToolCalls.length - 1];
+              lastToolCall.function.arguments = (lastToolCall.function.arguments || '') + toolCall.function.arguments;
+            }
+          }
+        }
+
+        if (chunk.choices[0]?.finish_reason === 'tool_calls') {
+          hasToolCalls = true;
+          const toolCallResults = [];
+
+          // Add tool calls to messages before processing
+          messagesWithToolCalls.push({
+            role: 'assistant',
+            tool_calls: currentToolCalls.map(tc => ({
+              id: tc.id,
+              type: 'function',
+              function: tc.function
+            }))
+          });
+
+          for (const toolCall of currentToolCalls) {
+            try {
+              const toolResponse = await this.toolConfig.useToolHandler(
+                { tool_calls: [toolCall] },
+                messagesWithToolCalls
+              );
+
+              toolCallResults.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: JSON.stringify(toolResponse)
+              });
+            } catch (error) {
+              console.error('Tool call error', error);
+            }
+          }
+
+          // Append tool call results to messages
+          messagesWithToolCalls.push(...toolCallResults);
+
+          // Update options for next iteration
+          options.messages = messagesWithToolCalls;
+
+          currentToolCalls = [];
+        }
+
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          yield content;
+        }
       }
+
+      // Break if no tool calls were found
+      if (!hasToolCalls) break;
+
+      recursions--;
     }
   }
 
