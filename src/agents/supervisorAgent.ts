@@ -171,13 +171,14 @@ export class SupervisorAgent extends Agent {
 
     this.leadAgent.toolConfig = {
       tool: this.supervisorTools,
-      useToolHandler: (response: any, conversation: any[]) => any,
+      useToolHandler: (response: any, conversation: any[]) => {},
       toolMaxRecursions: SupervisorAgent.DEFAULT_TOOL_MAX_RECURSIONS,
     };
   }
 
   private configurePrompt(): void {
-    const toolsStr = this.supervisorTools.tools.map((tool) => `${tool.name}:${tool.description}`).join("\n");
+    const toolsStr = (this.supervisorTools instanceof AgentTools ? this.supervisorTools.tools : this.supervisorTools)
+      .map((tool) => `${tool.name}:${tool.description}`).join("\n");
 
     const agentListStr = this.team.map((agent) => `${agent.name}: ${agent.description}`).join("\n");
 
