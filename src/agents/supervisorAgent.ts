@@ -163,6 +163,7 @@ export class SupervisorAgent extends Agent {
             },
             required: ["messages"],
           },
+          strict: true
         },
       },
     ];
