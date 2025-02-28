@@ -179,7 +179,7 @@ export class SupervisorAgent extends Agent {
     if (this.supervisorTools instanceof AgentTools) {
       toolsStr = this.supervisorTools.tools.map((tool) => `${tool.name}:${tool.description}`).join("\n");
     } else {
-      toolsStr = `${this.supervisorTools[0].function.name}:${this.supervisorTools[0].function.description}`).join("\n");
+      toolsStr = `${this.supervisorTools[0].function.name}:${this.supervisorTools[0].function.description}`;
     }
 
     const agentListStr = this.team.map((agent) => `${agent.name}: ${agent.description}`).join("\n");
