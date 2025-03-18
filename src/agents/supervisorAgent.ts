@@ -143,7 +143,6 @@ export class SupervisorAgent extends Agent {
             properties: {
               messages: {
                 type: "array",
-                minItems: 1,
                 items: {
                   type: "object",
                   properties: {
