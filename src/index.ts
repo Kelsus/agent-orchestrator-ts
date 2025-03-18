@@ -3,7 +3,11 @@ export { AmazonBedrockAgent, AmazonBedrockAgentOptions } from "./agents/amazonBe
 export { BedrockInlineAgent, BedrockInlineAgentOptions } from "./agents/bedrockInlineAgent";
 export { LambdaAgent, LambdaAgentOptions } from "./agents/lambdaAgent";
 export { LexBotAgent, LexBotAgentOptions } from "./agents/lexBotAgent";
-export { OpenAIAgent, OpenAIAgentOptions } from "./agents/openAIAgent";
+export {
+  OpenAIAgent,
+  OpenAIAgentOptions,
+  OPEN_AI_MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON,
+} from "./agents/openAIAgent";
 export { AnthropicAgent, AnthropicAgentOptions, AnthropicAgentOptionsWithAuth } from "./agents/anthropicAgent";
 export { Agent, AgentOptions } from "./agents/agent";
 export { Classifier, ClassifierResult } from "./classifiers/classifier";

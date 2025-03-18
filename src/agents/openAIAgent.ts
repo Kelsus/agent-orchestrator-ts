@@ -46,7 +46,7 @@ export type OpenAIAgentOptionsWithAuth = OpenAIAgentOptions &
 
 const DEFAULT_MAX_TOKENS = 1000;
 
-enum MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON {
+export enum OPEN_AI_MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON {
   GPT_4_5_PREVIEW = "gpt-4.5-preview",
   GPT_4_5_PREVIEW_2025_02_27 = "gpt-4.5-preview-2025-02-27",
   O3_MINI = "o3-mini",
@@ -132,10 +132,10 @@ export class OpenAIAgent extends Agent {
     }
 
     if (options.formatResponseAsJson) {
-      const models = Object.values(MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON);
+      const models = Object.values(OPEN_AI_MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON);
       if (
         !models.includes(
-          this.model as MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON
+          this.model as OPEN_AI_MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON
         )
       ) {
         throw new Error(`model must be one of  ${models.join(", ")}`);
