@@ -277,6 +277,9 @@ export class OpenAIAgent extends Agent {
 
       const assistantMessage = chatCompletion.choices[0]?.message?.content;
 
+      console.log(`Type of response from OpenAI: ${typeof assistantMessage}`);
+      console.log(`Response from OpenAI: ${assistantMessage}`);
+
       if (typeof assistantMessage !== "string") {
         throw new Error("Unexpected response format from OpenAI API");
       }
