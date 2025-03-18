@@ -1,7 +1,12 @@
-import { Agent, AgentDescription, AgentOptions } from './agent';
-import { ConversationMessage, OPENAI_MODEL_ID_GPT_O_MINI, ParticipantRole, TemplateVariables } from '../types';
-import OpenAI from 'openai';
-import { Logger } from '../utils/logger';
+import { Agent, AgentDescription, AgentOptions } from "./agent";
+import {
+  ConversationMessage,
+  OPENAI_MODEL_ID_GPT_O_MINI,
+  ParticipantRole,
+  TemplateVariables,
+} from "../types";
+import OpenAI from "openai";
+import { Logger } from "../utils/logger";
 import { Retriever } from "../retrievers/retriever";
 
 type WithApiKey = {
@@ -36,9 +41,23 @@ export interface OpenAIAgentOptions extends AgentOptions {
   };
 }
 
-export type OpenAIAgentOptionsWithAuth = OpenAIAgentOptions & (WithApiKey | WithClient);
+export type OpenAIAgentOptionsWithAuth = OpenAIAgentOptions &
+  (WithApiKey | WithClient);
 
 const DEFAULT_MAX_TOKENS = 1000;
+
+enum MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON {
+  GPT_4_5_PREVIEW = "gpt-4.5-preview",
+  GPT_4_5_PREVIEW_2025_02_27 = "gpt-4.5-preview-2025-02-27",
+  O3_MINI = "o3-mini",
+  O3_MINI_2025_1_3 = "o3-mini-2025-1-3",
+  O1 = "o1",
+  O1_2024_12_17 = "o1-2024-12-17",
+  GPT_4O_MINI = "gpt-4o-mini",
+  GPT_4O_MINI_2024_07_18 = "gpt-4o-mini-2024-07-18",
+  GPT_4O = "gpt-4o",
+  GPT_4O_2024_08_06 = "gpt-4o-2024-08-06",
+}
 
 export class OpenAIAgent extends Agent {
   private client: OpenAI;
@@ -62,7 +81,6 @@ export class OpenAIAgent extends Agent {
   };
 
   constructor(options: OpenAIAgentOptionsWithAuth) {
-
     super(options);
 
     if (!options.apiKey && !options.client) {
@@ -73,10 +91,6 @@ export class OpenAIAgent extends Agent {
     } else {
       if (!options.apiKey) throw new Error("OpenAI API key is required");
       this.client = new OpenAI({ apiKey: options.apiKey });
-    }
-
-    if (options.formatResponseAsJson) {
-      this.formatResponseAsJson = options.formatResponseAsJson;
     }
 
     this.model = options.model ?? OPENAI_MODEL_ID_GPT_O_MINI;
@@ -105,10 +119,10 @@ export class OpenAIAgent extends Agent {
     - Draw insights and connections from your extensive knowledge when appropriate.
     - Ask for clarification if any part of the question or prompt is ambiguous.
     - Maintain a consistent, respectful, and engaging tone tailored to the human's communication style.
-    - Seamlessly transition between topics as the human introduces new subjects.`
+    - Seamlessly transition between topics as the human introduces new subjects.`;
 
     this.customVariables = {};
-    this.systemPrompt = '';
+    this.systemPrompt = "";
 
     if (options.customSystemPrompt) {
       this.setSystemPrompt(
@@ -117,7 +131,18 @@ export class OpenAIAgent extends Agent {
       );
     }
 
+    if (options.formatResponseAsJson) {
+      const models = Object.values(MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON);
+      if (
+        !models.includes(
+          this.model as MODELS_THAT_SUPPORT_FORMAT_RESPONSE_AS_JSON
+        )
+      ) {
+        throw new Error(`model must be one of  ${models.join(", ")}`);
+      }
 
+      this.formatResponseAsJson = options.formatResponseAsJson;
+    }
   }
 
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -128,31 +153,31 @@ export class OpenAIAgent extends Agent {
     chatHistory: ConversationMessage[],
     additionalParams?: Record<string, string>
   ): Promise<ConversationMessage | AsyncIterable<any>> {
-
     this.updateSystemPrompt();
 
     let systemPrompt = this.systemPrompt;
 
     if (this.retriever) {
       // retrieve from Vector store
-      const response = await this.retriever.retrieveAndCombineResults(inputText);
+      const response =
+        await this.retriever.retrieveAndCombineResults(inputText);
       const contextPrompt =
         "\nHere is the context to use to answer the user's question:\n" +
         response;
-        systemPrompt = systemPrompt + contextPrompt;
+      systemPrompt = systemPrompt + contextPrompt;
     }
 
-
     const messages = [
-      { role: 'system', content: systemPrompt },
-      ...chatHistory.map(msg => ({
-        role: msg.role.toLowerCase() as OpenAI.Chat.ChatCompletionMessageParam['role'],
-        content: msg.content[0]?.text || ''
+      { role: "system", content: systemPrompt },
+      ...chatHistory.map((msg) => ({
+        role: msg.role.toLowerCase() as OpenAI.Chat.ChatCompletionMessageParam["role"],
+        content: msg.content[0]?.text || "",
       })),
-      { role: 'user' as const, content: inputText }
+      { role: "user" as const, content: inputText },
     ] as OpenAI.Chat.ChatCompletionMessageParam[];
 
-    const { maxTokens, temperature, topP, stopSequences } = this.inferenceConfig;
+    const { maxTokens, temperature, topP, stopSequences } =
+      this.inferenceConfig;
 
     const requestOptions: OpenAI.Chat.ChatCompletionCreateParams = {
       model: this.model,
@@ -162,15 +187,16 @@ export class OpenAIAgent extends Agent {
       temperature,
       top_p: topP,
       stop: stopSequences,
-      response_format: {type: this.formatResponseAsJson ? 'json_object' : 'text'},
-      tools: this.toolConfig?.tool || undefined
+      response_format: {
+        type: this.formatResponseAsJson ? "json_object" : "text",
+      },
+      tools: this.toolConfig?.tool || undefined,
     };
-
 
     if (this.streaming) {
       return this.handleStreamingResponse(requestOptions);
     } else {
-      let finalMessage: string = '';
+      let finalMessage: string = "";
       let toolUse = false;
       let recursions = this.toolConfig?.toolMaxRecursions || 5;
 
@@ -181,10 +207,13 @@ export class OpenAIAgent extends Agent {
           messages.push(response);
 
           if (!this.toolConfig) {
-            throw new Error('No tools available for tool use');
+            throw new Error("No tools available for tool use");
           }
 
-          const toolResponse = await this.toolConfig.useToolHandler(response, messages);
+          const toolResponse = await this.toolConfig.useToolHandler(
+            response,
+            messages
+          );
           messages.push(toolResponse);
           toolUse = true;
         } else {
@@ -214,44 +243,55 @@ export class OpenAIAgent extends Agent {
 
   private updateSystemPrompt(): void {
     const allVariables: TemplateVariables = {
-      ...this.customVariables
+      ...this.customVariables,
     };
-    this.systemPrompt = this.replaceplaceholders(this.promptTemplate, allVariables);
+    this.systemPrompt = this.replaceplaceholders(
+      this.promptTemplate,
+      allVariables
+    );
   }
 
-  private replaceplaceholders(template: string, variables: TemplateVariables): string {
+  private replaceplaceholders(
+    template: string,
+    variables: TemplateVariables
+  ): string {
     return template.replace(/{{(\w+)}}/g, (match, key) => {
       if (key in variables) {
         const value = variables[key];
-        return Array.isArray(value) ? value.join('\n') : String(value);
+        return Array.isArray(value) ? value.join("\n") : String(value);
       }
       return match;
     });
   }
 
-  private async handleSingleResponse(input: any): Promise<OpenAI.Chat.ChatCompletionMessage> {
+  private async handleSingleResponse(
+    input: any
+  ): Promise<OpenAI.Chat.ChatCompletionMessage> {
     try {
       const nonStreamingOptions = { ...input, stream: false };
-      const chatCompletion = await this.client.chat.completions.create(nonStreamingOptions);
+      const chatCompletion =
+        await this.client.chat.completions.create(nonStreamingOptions);
       if (!chatCompletion.choices || chatCompletion.choices.length === 0) {
-        throw new Error('No choices returned from OpenAI API');
+        throw new Error("No choices returned from OpenAI API");
       }
 
       const assistantMessage = chatCompletion.choices[0]?.message?.content;
 
-      if (typeof assistantMessage !== 'string') {
-        throw new Error('Unexpected response format from OpenAI API');
+      if (typeof assistantMessage !== "string") {
+        throw new Error("Unexpected response format from OpenAI API");
       }
 
       const message = chatCompletion.choices[0].message;
       return message as OpenAI.Chat.ChatCompletionMessage;
     } catch (error) {
-      Logger.logger.error('Error in OpenAI API call:', error);
+      Logger.logger.error("Error in OpenAI API call:", error);
       throw error;
     }
   }
 
-  private async * handleStreamingResponse(options: OpenAI.Chat.ChatCompletionCreateParams): AsyncIterable<string> {
+  private async *handleStreamingResponse(
+    options: OpenAI.Chat.ChatCompletionCreateParams
+  ): AsyncIterable<string> {
     let recursions = this.toolConfig?.toolMaxRecursions || 5;
 
     while (recursions > 0) {
@@ -261,7 +301,7 @@ export class OpenAIAgent extends Agent {
       const stream = await this.client.chat.completions.create({
         ...options,
         messages: messagesWithToolCalls,
-        stream: true
+        stream: true,
       });
 
       let currentToolCalls: any[] = [];
@@ -280,24 +320,27 @@ export class OpenAIAgent extends Agent {
             }
 
             if (toolCall.function?.arguments) {
-              const lastToolCall = currentToolCalls[currentToolCalls.length - 1];
-              lastToolCall.function.arguments = (lastToolCall.function.arguments || '') + toolCall.function.arguments;
+              const lastToolCall =
+                currentToolCalls[currentToolCalls.length - 1];
+              lastToolCall.function.arguments =
+                (lastToolCall.function.arguments || "") +
+                toolCall.function.arguments;
             }
           }
         }
 
-        if (chunk.choices[0]?.finish_reason === 'tool_calls') {
+        if (chunk.choices[0]?.finish_reason === "tool_calls") {
           hasToolCalls = true;
           const toolCallResults = [];
 
           // Add tool calls to messages before processing
           messagesWithToolCalls.push({
-            role: 'assistant',
-            tool_calls: currentToolCalls.map(tc => ({
+            role: "assistant",
+            tool_calls: currentToolCalls.map((tc) => ({
               id: tc.id,
-              type: 'function',
-              function: tc.function
-            }))
+              type: "function",
+              function: tc.function,
+            })),
           });
 
           for (const toolCall of currentToolCalls) {
@@ -308,12 +351,12 @@ export class OpenAIAgent extends Agent {
               );
 
               toolCallResults.push({
-                role: 'tool',
+                role: "tool",
                 tool_call_id: toolCall.id,
-                content: JSON.stringify(toolResponse)
+                content: JSON.stringify(toolResponse),
               });
             } catch (error) {
-              console.error('Tool call error', error);
+              console.error("Tool call error", error);
             }
           }
 
