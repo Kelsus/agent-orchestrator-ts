@@ -202,7 +202,7 @@ export class OpenAIAgent extends Agent {
 
       do {
         const response = await this.handleSingleResponse(requestOptions);
-
+        console.log(`HERE Response from OpenAI: ${JSON.stringify(response)}`);
         if (response.tool_calls) {
           messages.push(response);
 
@@ -276,12 +276,13 @@ export class OpenAIAgent extends Agent {
       }
 
       const assistantMessage = chatCompletion.choices[0]?.message?.content;
+      const toolCalls = chatCompletion.choices[0]?.message?.tool_calls;
 
       console.log(`Response from OpenAI choices: ${JSON.stringify(chatCompletion.choices)}`);
       console.log(`Response from OpenAI choices[0].message: ${JSON.stringify(chatCompletion.choices[0].message)}`);
       console.log(`Response from OpenAI chatCompletion: ${JSON.stringify(chatCompletion)}`);
 
-      if (typeof assistantMessage !== "string") {
+      if (typeof assistantMessage !== "string" && !(toolCalls instanceof Array)) {
         throw new Error("Unexpected response format from OpenAI API");
       }
 
