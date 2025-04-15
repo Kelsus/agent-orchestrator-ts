@@ -36,7 +36,7 @@
     "axios": "^1.7.2",
     "eslint-config-prettier": "^9.1.0",
     "natural": "^7.0.7",
-    "openai": "^4.52.7",
+    "openai": "^4.86.1",
     "prettier": "^3.3.3",
     "stopword": "^3.0.1"
   },

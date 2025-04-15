@@ -6,9 +6,11 @@ import { Logger } from "../utils/logger";
 import { AgentTool, AgentTools } from "../utils/tool";
 import { InMemoryChatStorage } from "../storage/memoryChatStorage";
 import { ChatStorage } from "../storage/chatStorage";
+import { OpenAIAgent } from "./openAIAgent";
+import OpenAI from "openai";
 
 export interface SupervisorAgentOptions extends AgentOptions {
-  leadAgent: BedrockLLMAgent | AnthropicAgent;
+  leadAgent: BedrockLLMAgent | AnthropicAgent | OpenAIAgent;
   leadAgentGuidelines?: string;
   team: Agent[];
   storage?: ChatStorage;
@@ -39,19 +41,19 @@ export class SupervisorAgent extends Agent {
 - NEVER output your thoughts before and after you invoke a tool or before you respond to the User.
   `;
 
-  private leadAgent: BedrockLLMAgent | AnthropicAgent;
+  private leadAgent: BedrockLLMAgent | AnthropicAgent | OpenAIAgent;
   private leadAgentGuidelines: string;
   private team: Agent[];
   private storage: ChatStorage;
   private trace: boolean;
   private userId: string = "";
   private sessionId: string = "";
-  private supervisorTools: AgentTools;
+  private supervisorTools: AgentTools | OpenAI.ChatCompletionTool[];
   private promptTemplate: string;
 
   constructor(options: SupervisorAgentOptions) {
-    if (!(options.leadAgent instanceof BedrockLLMAgent || options.leadAgent instanceof AnthropicAgent)) {
-      throw new Error("Supervisor must be BedrockLLMAgent or AnthropicAgent");
+    if (!(options.leadAgent instanceof BedrockLLMAgent || options.leadAgent instanceof AnthropicAgent || options.leadAgent instanceof OpenAIAgent)) {
+      throw new Error("Supervisor must be either BedrockLLMAgent, AnthropicAgent or OpenAIAgent");
     }
 
     if (options.extraTools && !(options.extraTools instanceof AgentTools || Array.isArray(options.extraTools))) {
@@ -76,7 +78,12 @@ export class SupervisorAgent extends Agent {
 
     this.leadAgentGuidelines = options.leadAgentGuidelines || SupervisorAgent.DEFAULT_LEAD_AGENT_GUIDELINES;
 
-    this.configureSupervisorTools(options.extraTools);
+    if (options.leadAgent instanceof OpenAIAgent) {
+      // TODO: Add support for extra tools
+      this.configureSupervisorToolsForOpenAI();
+    } else {
+      this.configureSupervisorTools(options.extraTools);
+    }
     this.configurePrompt();
   }
 
@@ -124,8 +131,59 @@ export class SupervisorAgent extends Agent {
     };
   }
 
+  private configureSupervisorToolsForOpenAI(): void {
+    const sendMessagesTool: OpenAI.ChatCompletionTool[] = [
+      {
+        type: "function",
+        function: {
+          name: "send_messages",
+          description: "Send messages to multiple agents in parallel.",
+          parameters: {
+            type: "object",
+            properties: {
+              messages: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    recipient: {
+                      type: "string",
+                      description: "Agent name to send message to.",
+                    },
+                    content: {
+                      type: "string",
+                      description: "Message content.",
+                    },
+                  },
+                  required: ["recipient", "content"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["messages"],
+            additionalProperties: false,
+          },
+          strict: true,
+        },
+      },
+    ];
+
+    this.supervisorTools = sendMessagesTool;
+
+    this.leadAgent.toolConfig = {
+      tool: this.supervisorTools,
+      useToolHandler: (response: any, conversation: any[]) => {},
+      toolMaxRecursions: SupervisorAgent.DEFAULT_TOOL_MAX_RECURSIONS,
+    };
+  }
+
   private configurePrompt(): void {
-    const toolsStr = this.supervisorTools.tools.map((tool) => `${tool.name}:${tool.description}`).join("\n");
+    let toolsStr;
+    if (this.supervisorTools instanceof AgentTools) {
+      toolsStr = this.supervisorTools.tools.map((tool) => `${tool.name}:${tool.description}`).join("\n");
+    } else {
+      toolsStr = `${this.supervisorTools[0].function.name}:${this.supervisorTools[0].function.description}`;
+    }
 
     const agentListStr = this.team.map((agent) => `${agent.name}: ${agent.description}`).join("\n");
 
@@ -295,8 +353,6 @@ ${this.leadAgentGuidelines}
   }
 
   getChilds(): { [key: string]: AgentDescription } {
-    return Object.fromEntries(
-      this.team.map((agent) => [agent.id, { name: agent.name, description: agent.description, model: agent.getModel(), childs: agent.getChilds() }])
-    );
+    return Object.fromEntries(this.team.map((agent) => [agent.id, { name: agent.name, description: agent.description, model: agent.getModel(), childs: agent.getChilds() }]));
   }
 }
