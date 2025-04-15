@@ -220,8 +220,21 @@ ${this.leadAgentGuidelines}
       Logger.logger.info(`\n> Lead Agent Messages ${messages}`);
       Logger.logger.info(`\n> Lead Agent Messages Type: ${typeof messages}`);
       Logger.logger.info(`\n> Lead Agent Messages is an Array: ${Array.isArray(messages)}`);
-      const messagesA = Array.isArray(messages) ? messages : JSON.parse(messages);
-      const tasks = messagesA
+
+      let messagesToProcess: Array<{ recipient: string; content: string }>;
+
+      if (typeof messages === 'string') {
+        try {
+          messagesToProcess = JSON.parse(messages);
+        } catch (parseError) {
+          Logger.logger.warn(`Failed to parse messages string: ${parseError}`);
+          throw new Error(`Invalid messages format: Could not parse string as JSON`);
+        }
+      } else {
+        messagesToProcess = Array.isArray(messages) ? messages : [messages];
+      }
+
+      const tasks = messagesToProcess
         .map((message) => {
           const agent = this.team.find((a) => a.name === message.recipient);
           return agent ? this.sendMessage(agent, message.content, this.userId, this.sessionId, {}) : null;
